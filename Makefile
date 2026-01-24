@@ -82,6 +82,9 @@ up: $(addsuffix .up,$(SERVICES))
 # Stop all services
 down: $(addsuffix .down,$(SERVICES))
 
+# Reload all services
+reload: $(addsuffix .reload,$(SERVICES))
+
 # Update all services
 update: $(addsuffix .update,$(SERVICES))
 
