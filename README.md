@@ -1,2 +1,4 @@
 # makefile-dockerservices
-Makefile to manage docker services
+Makefile for some basic docker files and services management using CLI.
+
+
