@@ -1,7 +1,8 @@
 # -----------------------
 # Phony targets
 # -----------------------
-.PHONY: up down update default
+.PHONY: up down update liste prune default 
+
 
 # -----------------------
 # Configuration variables
@@ -9,11 +10,13 @@
 # Root folder where all service directories are located
 SERVICES_DIR := $(HOME)/services
 
-# List of service names (subdirectories of SERVICES_DIR)
-SERVICES := $(notdir $(wildcard $(SERVICES_DIR)/*))
+# List of service names (subdirectories of SERVICES_DIR that contains a compose.yml)
+SERVICES := $(notdir $(shell for d in $(SERVICES_DIR)/*; do \
+	if [ -f "$$d/compose.yml" ]; then echo "$$d"; fi; done))
 
 # Compose file name (default: compose.yml, can be overridden)
 COMPOSE_FILE ?= compose.yml
+
 
 # -----------------------
 # Pattern rules for individual services
@@ -32,8 +35,7 @@ COMPOSE_FILE ?= compose.yml
 # Reload a service (stop then start)
 # Usage: make <service>.reload
 %.reload:
-	cd $(SERVICES_DIR)/$* && docker compose down
-	cd $(SERVICES_DIR)/$* && docker compose up -d
+	cd $(SERVICES_DIR)/$* && docker compose down && docker compose up -d
 
 # Open the compose file for a service in the nano editor
 # Usage: make <service>.edit
@@ -43,15 +45,7 @@ COMPOSE_FILE ?= compose.yml
 # Pull latest images and restart a service, then optionally prune unused Docker images
 # Usage: make <service>.update
 %.update:
-	cd $(SERVICES_DIR)/$* && docker compose pull
-	cd $(SERVICES_DIR)/$* && docker compose up -d
-	@read -p "Prune unused Docker images? [y/N] " ans; \
-	if [ "$$ans" = "y" ] || [ "$$ans" = "Y" ]; then \
-		docker image prune -a -f; \
-		echo "Pruned unused Docker images"; \
-	else \
-		echo "Skipped pruning"; \
-	fi
+	cd $(SERVICES_DIR)/$* && docker compose pull && docker compose up -d
 
 # Create a new service directory, create an empty compose file, then open it
 # Usage: make <service>.new
@@ -67,10 +61,11 @@ COMPOSE_FILE ?= compose.yml
 	@read -p "Are you sure you want to delete $(SERVICES_DIR)/$* ? [y/N] " ans; \
 	if [ "$$ans" = "y" ] || [ "$$ans" = "Y" ]; then \
 		rm -rf $(SERVICES_DIR)/$*; \
-		echo "Deleted $(SERVICES_DIR)/$*"; \
-		else \
-		echo "Aborted"; \
+		@echo "Deleted $(SERVICES_DIR)/$*"; \
+	else \
+		@echo "Aborted"; \
 	fi
+
 
 # -----------------------
 # Aggregate targets for all services
@@ -82,11 +77,28 @@ up: $(addsuffix .up,$(SERVICES))
 # Stop all services
 down: $(addsuffix .down,$(SERVICES))
 
-# Reload all services
-reload: $(addsuffix .reload,$(SERVICES))
-
 # Update all services
-update: $(addsuffix .update,$(SERVICES))
+update:
+	@echo "Detected services: $(SERVICES)"
+	@for s in $(SERVICES); do \
+		$(MAKE) $$s.update; \
+	done
+	$(MAKE) prune
+
+# List all services (folders that have a compose.yml inside)
+list:
+	@echo "Detected services: $(SERVICES)"
+
+# Delete unused images
+prune:
+	@read -p "Prune unused Docker images? [y/N] " ans; \
+	if [ "$$ans" = "y" ] || [ "$$ans" = "Y" ]; then \
+		docker image prune -a -f; \
+	else \
+		echo "Skipped pruning"; \
+	fi
+	@echo "Pruned unused Docker images";
+
 
 # -----------------------
 # Default target (safe behavior)
