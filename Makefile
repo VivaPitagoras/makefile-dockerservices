@@ -77,6 +77,9 @@ up: $(addsuffix .up,$(SERVICES))
 # Stop all services
 down: $(addsuffix .down,$(SERVICES))
 
+# Reload all services
+reload: $(addsuffix .reload,$(SERVICES))
+
 # Update all services
 update:
 	@echo "Detected services: $(SERVICES)"
@@ -87,7 +90,10 @@ update:
 
 # List all services (folders that have a compose.yml inside)
 list:
-	@echo "Detected services: $(SERVICES)"
+	@echo "Detected services:"
+	@for s in $(SERVICES); do \
+		echo " - $$s"; \
+	done
 
 # Delete unused images
 prune:
@@ -108,7 +114,7 @@ prune:
 default:
 	@echo "No target specified. Nothing will happen."
 	@echo "Available targets:"
-	@echo "  up, down, update"
+	@echo "  up, down, reload, update, list, prune"
 	@echo "  <service>.[up|down|reload|edit|update|new|del]"
 
 # Set the default goal to `default`, so `make` alone is safe
