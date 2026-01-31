@@ -1,7 +1,7 @@
 # -----------------------
 # Phony targets
 # -----------------------
-.PHONY: up down update liste prune default 
+.PHONY: up down update liste prune dry-clean clean default 
 
 
 # -----------------------
@@ -10,12 +10,16 @@
 # Root folder where all service directories are located
 SERVICES_DIR := $(HOME)/services
 
+# Compose file name (default: compose.yml, can be overridden)
+COMPOSE_FILE ?= compose.yml
+
+# Set your prefered editor
+EDITOR ?= nano
+
 # List of service names (subdirectories of SERVICES_DIR that contains a compose.yml)
 SERVICES := $(notdir $(shell for d in $(SERVICES_DIR)/*; do \
 	if [ -f "$$d/compose.yml" ]; then echo "$$d"; fi; done))
 
-# Compose file name (default: compose.yml, can be overridden)
-COMPOSE_FILE ?= compose.yml
 
 
 # -----------------------
@@ -40,7 +44,12 @@ COMPOSE_FILE ?= compose.yml
 # Open the compose file for a service in the nano editor
 # Usage: make <service>.edit
 %.edit:
-	nano $(SERVICES_DIR)/$*/$(COMPOSE_FILE)
+	$(EDITOR) $(SERVICES_DIR)/$*/$(COMPOSE_FILE)
+
+# Create/edit the .env file
+# Usage: make <service>.env
+%.env:
+	$(EDITOR) $(SERVICES_DIR)/$*/.env
 
 # Pull latest images and restart a service, then optionally prune unused Docker images
 # Usage: make <service>.update
@@ -51,7 +60,7 @@ COMPOSE_FILE ?= compose.yml
 # Usage: make <service>.new
 %.new:
 	mkdir -p $(SERVICES_DIR)/$*
-	touch $(SERVICES_DIR)/$*/$(COMPOSE_FILE)
+	#touch $(SERVICES_DIR)/$*/$(COMPOSE_FILE)
 	$(MAKE) $*.edit
 
 # Delete a service directory and all its contents (destructive!)
@@ -82,15 +91,15 @@ reload: $(addsuffix .reload,$(SERVICES))
 
 # Update all services
 update:
-	@echo "Detected services: $(SERVICES)"
 	@for s in $(SERVICES); do \
 		$(MAKE) $$s.update; \
+		echo " - $$s updated"; \
 	done
 	$(MAKE) prune
 
 # List all services (folders that have a compose.yml inside)
 list:
-	@echo "Detected services:"
+	@echo "Detected stacks:"
 	@for s in $(SERVICES); do \
 		echo " - $$s"; \
 	done
@@ -105,6 +114,31 @@ prune:
 	fi
 	@echo "Pruned unused Docker images";
 
+# It will show all the non-stack folders that can be deleted
+dry-clean:
+	@echo "Folders that would be removed:"
+	@for d in $(SERVICES_DIR)/*; do \
+		if [ -d "$$d" ] && [ ! -f "$$d/$(COMPOSE_FILE)" ]; then \
+			echo " - $$d"; \
+		fi; \
+	done
+
+# Delete folders that are not a docker sevice
+# Prompts for confirmation before deleting to prevent accidents
+clean:
+	@read -p "Are you sure you want to delete all folders without $(COMPOSE_FILE)? [y/N] " ans; \
+	if [ "$$ans" = "y" ] || [ "$$ans" = "Y" ]; then \
+		echo "Cleaning non-stack folders in $(SERVICES_DIR)..."; \
+		for d in $(SERVICES_DIR)/*; do \
+			if [ -d "$$d" ] && [ ! -f "$$d/$(COMPOSE_FILE)" ]; then \
+				echo "Removing $$d (no $(COMPOSE_FILE))"; \
+				rm -rf "$$d"; \
+			fi; \
+		done; \
+	else \
+		echo "Skipping cleaning"; \
+	fi
+
 
 # -----------------------
 # Default target (safe behavior)
@@ -114,8 +148,8 @@ prune:
 default:
 	@echo "No target specified. Nothing will happen."
 	@echo "Available targets:"
-	@echo "  up, down, reload, update, list, prune"
-	@echo "  <service>.[up|down|reload|edit|update|new|del]"
+	@echo "  up, down, reload, update, list, prune, dry-clean, clean"
+	@echo "  <service>.[up|down|reload|edit|update|new|.env|del]"
 
 # Set the default goal to `default`, so `make` alone is safe
 .DEFAULT_GOAL := default
